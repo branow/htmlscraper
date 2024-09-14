@@ -9,26 +9,61 @@ import (
 	"golang.org/x/net/html"
 )
 
+// The tags that let you to specify where the valuable data is and how to
+// get it from the [html.Node].
 const (
-	SelectorTag  = "select"
-	ExtractorTag = "extract"
+	SelectorTag  = "select"  // jQuery-like selector to find the node
+	ExtractorTag = "extract" // extract operation to get useful data from the node
 )
 
+// Extractor tags to specify extract operations.
 const (
-	TextExtractTag = "text"
-	AttrExtractTag = "@"
-	FuncExtractTag = "()"
+	TextExtractTag = "text" // get an inner text of the node
+	AttrExtractTag = "@"    // get a value of an attribute ("@href", "@src")
 )
 
+// Extractor is a function that processes the given node and returns
+// the valuable data in string format.
 type Extractor func(node *html.Node) (string, error)
 
+// Scraper is a struct that contains a method to scrape data from an
+// HTML document ([goquery.Document]).
 type Scraper struct {
-	Strict     bool
+
+	// If Strict flag is true, the [Scraper.Scrape] method
+	// returns an error if the seeking HTML node is not found otherwise
+	// it returns a zero value according to the type. The exception is an
+	// slice type for which the flag does not work and even if there
+	// are not found notes it returns an empty slice of the specified type
+	// with a capacity of 10.
+	Strict bool
+
+	// Extractors is a map that matches custom user
+	// extractors to extract tags. Do not use reserved Extractors tag names
+	// and patterns ([TextExtractTag], [AttrExtractTag]), otherwise the
+	// default implementation is executed.
 	Extractors map[string]Extractor
 }
 
+// Scrape scrapes the given doc and writes the useful information into o.
+//
+// o must be a pointer to a string, slice, or struct, otherwise it causes an error.
+// Slices and structs both can contain strings, slices, and structs but
+// the end value must be a string.
+//   - valid - struct{Name string, Nicknames []string}
+//   - valid - []struct{{Name string, Nicknames []string}}
+//   - invalid - struct{Name Stringer, Nicknames []string}
+//   - invalid - []struct{{Name string, Nicknames []int}}
+//
+// selector is a jQuery-like selector that specifies a path to nodes
+// (is used in [goquery.Selection.Find]). If selector is empty the doc selection
+// (it uses [goquery.Document.Selection]) is considered as default.
+//
+// extract is a value that specifies how to get useful data from the node.
+// extract is required only if o is a pointer to a string or slice, in all
+// other cases you can leave it empty.
 func (scraper Scraper) Scrape(doc *goquery.Document, o any, selector string, extract string) error {
-	err := errors.Join(checkNil(doc, "doc"), checkNil(o, "variable"))
+	err := errors.Join(checkNil(doc, "doc"), checkNil(o, "o"))
 	if err != nil {
 		return err
 	}
@@ -139,8 +174,10 @@ func (s Scraper) getExtractor(extract string) (Extractor, error) {
 			}
 			return "", GetAttributeNotFoundErr(attr)
 		}, nil
-	} else if extractor, ok := s.Extractors[extract]; ok {
-		return extractor, nil
+	} else if s.Extractors != nil {
+		if extractor, ok := s.Extractors[extract]; ok {
+			return extractor, nil
+		}
 	}
 	return nil, GetExtractErr(extract)
 }

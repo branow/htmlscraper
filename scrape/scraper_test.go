@@ -231,7 +231,7 @@ func TestScraper_Scrape_CommonErrors(t *testing.T) {
 	cfgs := []ScrapeCfg{
 		{
 			CaseName: "nil errors",
-			eErr:     errors.Join(GetNilErr("doc"), GetNilErr("variable")),
+			eErr:     errors.Join(GetNilErr("doc"), GetNilErr("o")),
 		},
 		{
 			CaseName: "not a pointer",

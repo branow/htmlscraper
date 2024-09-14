@@ -36,7 +36,8 @@ func GetKindErr(typeName, expKind, actKind any) error {
 }
 
 func GetNilErr(name string) error {
-	return WrapScrapeErr(fmt.Errorf("is nil"))
+	err := fmt.Errorf("%s is nil", name)
+	return WrapScrapeErr(err)
 }
 
 func WrapScrapeErr(err error) error {
