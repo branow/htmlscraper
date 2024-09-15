@@ -27,10 +27,9 @@ type Scraper struct {
 	// with a capacity of 10.
 	Strict bool
 
-	// Extractors is a map that matches custom user
-	// extractors to extract tags. Do not use reserved Extractors tag names
-	// and patterns ([TextExtractTag], [AttrExtractTag]), otherwise the
-	// default implementation is executed.
+	// Extractors is a map that matches custom user extractors to extract tags.
+	// Do not use reserved extractor tag names and patterns ([TextExtractTag],
+	// [AttrExtractTag], and others), otherwise, the default implementation is executed.
 	Extractors map[*Match]Extractor
 }
 
