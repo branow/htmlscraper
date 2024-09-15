@@ -15,7 +15,7 @@ import (
 
 type ScrapeCfg struct {
 	CaseName   string
-	extractors map[string]Extractor
+	extractors map[*Match]Extractor
 	strict     bool
 	doc        *goquery.Document
 	o          any
@@ -51,7 +51,9 @@ func TestScraper_Scrape(t *testing.T) {
                     American" style="cursor: pointer" valign="top">&nbsp;</div><span class="phon">/dəˈrekt/</span><span class="sep">,</span> <div class="sound audio_play_button pron-us icon-audio" data-src-mp3="https://www.oxfordlearnersdictionaries.com/media/english/us_pron/d/dir/direc/direct__us_2_rr.mp3" data-src-ogg="https://www.oxfordlearnersdictionaries.com/media/english/us_pron_ogg/d/dir/direc/direct__us_2_rr.ogg" title="direct pronunciation
                     American" style="cursor: pointer" valign="top">&nbsp;</div><span class="phon">/daɪˈrekt/</span></div></span></div>`
 
-	levelExtractor := func(node *html.Node) (string, error) {
+	customExtractors := map[*Match]Extractor{}
+	levelMatch := GetEqualMatch("*level")
+	customExtractors[&levelMatch] = func(node *html.Node, extract string) (string, error) {
 		for _, a := range node.Attr {
 			if a.Key == "href" {
 				ps := strings.Split(a.Val, "&")
@@ -84,7 +86,7 @@ func TestScraper_Scrape(t *testing.T) {
 	cfgs := []ScrapeCfg{
 		{
 			CaseName:   "scrape dictionary info",
-			extractors: map[string]Extractor{"*level": levelExtractor},
+			extractors: customExtractors,
 			doc:        getDoc(htmldata),
 			o:          &Top{},
 			exp: &Top{

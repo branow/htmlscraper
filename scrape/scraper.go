@@ -3,7 +3,6 @@ package scrape
 import (
 	"errors"
 	"reflect"
-	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/html"
@@ -15,16 +14,6 @@ const (
 	SelectorTag  = "select"  // jQuery-like selector to find the node
 	ExtractorTag = "extract" // extract operation to get useful data from the node
 )
-
-// Extractor tags to specify extract operations.
-const (
-	TextExtractTag = "text" // get an inner text of the node
-	AttrExtractTag = "@"    // get a value of an attribute ("@href", "@src")
-)
-
-// Extractor is a function that processes the given node and returns
-// the valuable data in string format.
-type Extractor func(node *html.Node) (string, error)
 
 // Scraper is a struct that contains a method to scrape data from an
 // HTML document ([goquery.Document]).
@@ -42,7 +31,7 @@ type Scraper struct {
 	// extractors to extract tags. Do not use reserved Extractors tag names
 	// and patterns ([TextExtractTag], [AttrExtractTag]), otherwise the
 	// default implementation is executed.
-	Extractors map[string]Extractor
+	Extractors map[*Match]Extractor
 }
 
 // Scrape scrapes the given doc and writes the useful information into o.
@@ -102,14 +91,12 @@ func (scraper Scraper) scrapeString(selection *goquery.Selection, ov reflect.Val
 		}
 	}
 
-	extractor, err := scraper.getExtractor(extract)
-	if err != nil {
-		return err
-	}
-
 	node := selection.Nodes[0]
-	val, err := extractor(node)
+	val, err := scraper.toExtract(node, extract)
 	if err != nil {
+		if err.Error() == GetExtractErr(extract).Error() {
+			return err
+		}
 		return WrapExtractErr(selector, err)
 	}
 	ov.SetString(val)
@@ -159,25 +146,20 @@ func (scraper Scraper) scrapeStruct(selection *goquery.Selection, ot reflect.Typ
 	return nil
 }
 
-func (s Scraper) getExtractor(extract string) (Extractor, error) {
-	if extract == TextExtractTag {
-		return func(node *html.Node) (string, error) {
-			return node.FirstChild.Data, nil
-		}, nil
-	} else if strings.HasPrefix(extract, AttrExtractTag) {
-		attr := extract[1:]
-		return func(node *html.Node) (string, error) {
-			for _, v := range node.Attr {
-				if v.Key == attr {
-					return v.Val, nil
-				}
-			}
-			return "", GetAttributeNotFoundErr(attr)
-		}, nil
-	} else if s.Extractors != nil {
-		if extractor, ok := s.Extractors[extract]; ok {
-			return extractor, nil
+func (s Scraper) toExtract(node *html.Node, extract string) (string, error) {
+	defaultMap := GetExtractorMap()
+	for match, extractor := range defaultMap {
+		extract, ok := (*match)(extract)
+		if ok {
+			return extractor(node, extract)
 		}
 	}
-	return nil, GetExtractErr(extract)
+	customMap := s.Extractors
+	for match, extractor := range customMap {
+		extract, ok := (*match)(extract)
+		if ok {
+			return extractor(node, extract)
+		}
+	}
+	return "", GetExtractErr(extract)
 }
