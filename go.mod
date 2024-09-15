@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
-	github.com/branow/tabtest v1.0.0
+	github.com/branow/tabtest v0.1.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.29.0
 )

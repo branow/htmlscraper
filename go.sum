@@ -2,6 +2,8 @@ github.com/PuerkitoBio/goquery v1.10.0 h1:6fiXdLuUvYs2OJSvNRqlNPoBm6YABE226xrbav
 github.com/PuerkitoBio/goquery v1.10.0/go.mod h1:TjZZl68Q3eGHNBA8CWaxAN7rOU1EbDz3CWuolcO5Yu4=
 github.com/andybalholm/cascadia v1.3.2 h1:3Xi6Dw5lHF15JtdcmAHD3i1+T8plmv7BQ/nsViSLyss=
 github.com/andybalholm/cascadia v1.3.2/go.mod h1:7gtRlve5FxPPgIgX36uWBX58OdBsSS6lUvCFb+h7KvU=
+github.com/branow/tabtest v0.1.0 h1:5gO/WNASVEw9VCWZcRhP33ah2izbDfvhTj9PsswISCY=
+github.com/branow/tabtest v0.1.0/go.mod h1:fzK7ONZMV9eIuowCtmnKPj4ijXC9kvD/SUZwpPeqmhA=
 github.com/branow/tabtest v1.0.0 h1:9hi5l2GOV5Uklzh6XAvnGttDwqHwEx8K1m69pQMYd4E=
 github.com/branow/tabtest v1.0.0/go.mod h1:fzK7ONZMV9eIuowCtmnKPj4ijXC9kvD/SUZwpPeqmhA=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
