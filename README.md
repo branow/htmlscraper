@@ -163,11 +163,12 @@ func ScrapeSliceOfStructs() {
 	raisePanic(err)
 
 	// create custom extractor for price data
-	priceExtractor := func(node *html.Node) (string, error) {
+	priceMatch := scrape.GetEqualMatch("*price")
+	priceExtractor := func(node *html.Node, extract string) (string, error) {
 		price := node.FirstChild.Data
 		return strings.Replace(price, "$", "", 1), nil
 	}
-	customExtractors := map[string]scrape.Extractor{"*price": priceExtractor}
+	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
 	scraper := scrape.Scraper{Extractors: customExtractors}
@@ -222,12 +223,13 @@ func ScrapeStruct() {
 	doc, err := goquery.NewDocumentFromReader(file)
 	raisePanic(err)
 
-	// create a custom extractor for price data
-	priceExtractor := func(node *html.Node) (string, error) {
+	// create custom extractor for price data
+	priceMatch := scrape.GetEqualMatch("*price")
+	priceExtractor := func(node *html.Node, extract string) (string, error) {
 		price := node.FirstChild.Data
 		return strings.Replace(price, "$", "", 1), nil
 	}
-	customExtractors := map[string]scrape.Extractor{"*price": priceExtractor}
+	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
 	scraper := scrape.Scraper{Extractors: customExtractors}
@@ -256,6 +258,7 @@ func ScrapeStruct() {
 	}
 	fmt.Println("}")
 }
+
 ```
 It prints:
 ```
