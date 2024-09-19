@@ -34,6 +34,7 @@ Lets scrape the following body tag of [catalog.html](https://github.com/branow/h
  - [Scrape the product names](#scrape-the-product-names)
  - [Scrape the products](#scrape-the-products)
  - [Scrape the catalog](#scrape-the-catalog)
+ - [Scrape absent data](#scrape-absent-data)
 
 ```html
 <body>
@@ -57,6 +58,11 @@ Lets scrape the following body tag of [catalog.html](https://github.com/branow/h
                 <h2>Product 3</h2>
                 <p>Best value for your money.</p>
                 <p class="price">$19.99</p>
+            </div>
+            <div class="product">
+                <h2>Product 4</h2>
+                <p>The product that you want to buy.</p>
+                <p class="price">$10.99</p>
             </div>
         </div>
     </div>
@@ -137,7 +143,7 @@ func ScrapeSliceOfStrings() {
 It prints:
 ```
 Got Error: <nil>
-Got Output: [Product 1 Product 2 Product 3]
+Got Output: [Product 1 Product 2 Product 3 Product 4]
 ```
 [The example file.](https://github.com/branow/htmlscraper/blob/main/examples/scrape_slice_of_strings.go)
 
@@ -199,6 +205,7 @@ Got Output:
 {Product 1 Great product for your needs. 29.99 https://via.placeholder.com/200}
 {Product 2 Top-rated product with excellent reviews. 39.99 https://via.placeholder.com/200}
 {Product 3 Best value for your money. 19.99 https://via.placeholder.com/200}
+{Product 4 The product that you want to buy. 10.99 }
 ```
 [The example file.](https://github.com/branow/htmlscraper/blob/main/examples/scrape_slice_of_structs.go)
 
@@ -262,14 +269,85 @@ func ScrapeStruct() {
 ```
 It prints:
 ```
+Got Error: <nil>
+Got Output:
 Catalog {
 Product Catalog
 {Product 1 Great product for your needs. 29.99 https://via.placeholder.com/200}
 {Product 2 Top-rated product with excellent reviews. 39.99 https://via.placeholder.com/200}
 {Product 3 Best value for your money. 19.99 https://via.placeholder.com/200}
+{Product 4 The product that you want to buy. 10.99 }
 }
 ```
 [The example file.](https://github.com/branow/htmlscraper/blob/main/examples/scrape_struct.go)
+
+### Scrape absent data
+
+If some data could be absent in an HTML document, pointers should be used. Pointers let you save some memory but first and foremost checking whether a pointer is nil gives you information about the absence of data in the HTML document.
+
+```go
+package examples
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/branow/htmlscraper/scrape"
+	"golang.org/x/net/html"
+)
+
+func ScrapePointers() {
+	// create goquery document
+	file := getCatalogFile()
+	defer file.Close()
+	doc, err := goquery.NewDocumentFromReader(file)
+	raisePanic(err)
+
+	// create custom extractor for price data
+	priceMatch := scrape.GetEqualMatch("*price")
+	priceExtractor := func(node *html.Node, extract string) (string, error) {
+		price := node.FirstChild.Data
+		return strings.Replace(price, "$", "", 1), nil
+	}
+	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
+
+	// create Scraper
+	scraper := scrape.Scraper{Extractors: customExtractors}
+
+	// scraping
+	type Image struct {
+		Src string `extract:"@src"`
+		Alt string `extract:"@alt"`
+	}
+	type Product struct {
+		Name        string `select:"h2" extract:"text"`
+		Description string `select:"p" extract:"text"`
+		Price       string `select:".price" extract:"*price"`
+		Image       *Image `select:"img"`
+	}
+	var products []Product
+	err = scraper.Scrape(doc, &products, ".product", "")
+
+	// get output
+	fmt.Println("Got Error:", err)
+	fmt.Println("Got Output:")
+	for _, p := range products {
+		fmt.Println(p)
+	}
+}
+
+```
+It prints:
+```
+Got Error: <nil>
+Got Output:
+{Product 1 Great product for your needs. 29.99 0xc00009ad00}
+{Product 2 Top-rated product with excellent reviews. 39.99 0xc00009ada0}
+{Product 3 Best value for your money. 19.99 0xc00009ae40}
+{Product 4 The product that you want to buy. 10.99 <nil>}
+```
+[The example file.](https://github.com/branow/htmlscraper/blob/main/examples/scrape_pointers.go)
 
 ## Contributing
 
