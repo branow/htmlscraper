@@ -36,12 +36,8 @@ type Scraper struct {
 // Scrape scrapes the given doc and writes the useful information into o.
 //
 // o must be a pointer to a string, slice, or struct, otherwise it causes an error.
-// Slices and structs both can contain strings, slices, and structs but
+// Slices and structs both can contain pointers, strings, slices, and structs but
 // the end value must be a string.
-//   - valid - struct{Name string, Nicknames []string}
-//   - valid - []struct{{Name string, Nicknames []string}}
-//   - invalid - struct{Name Stringer, Nicknames []string}
-//   - invalid - []struct{{Name string, Nicknames []int}}
 //
 // selector is a jQuery-like selector that specifies a path to nodes
 // (is used in [goquery.Selection.Find]). If selector is empty the doc selection
@@ -72,6 +68,8 @@ func (scraper Scraper) scrapeObject(selection *goquery.Selection, ot reflect.Typ
 		return scraper.scrapeSlice(selection, ot, ov, selector, extract)
 	case reflect.Struct:
 		return scraper.scrapeStruct(selection, ot, ov, selector)
+	case reflect.Pointer:
+		return scraper.scrapePointer(selection, ot, ov, selector, extract)
 	default:
 		return GetMultiKindErr(ot, []any{reflect.String, reflect.Slice, reflect.Struct}, ot.Kind())
 	}
@@ -142,6 +140,27 @@ func (scraper Scraper) scrapeStruct(selection *goquery.Selection, ot reflect.Typ
 			return err
 		}
 	}
+	return nil
+}
+
+func (scraper Scraper) scrapePointer(selection *goquery.Selection, ot reflect.Type, ov reflect.Value, selector, extract string) error {
+	if len(selector) != 0 {
+		selection = selection.Find(selector)
+	}
+	if selection.Size() == 0 {
+		if scraper.Strict {
+			return GetNotFoundErr(selector)
+		} else {
+			return nil
+		}
+	}
+	ote := ot.Elem()
+	newValue := reflect.New(ote)
+	err := scraper.scrapeObject(selection, ote, newValue.Elem(), "", extract)
+	if err != nil {
+		return err
+	}
+	ov.Set(newValue)
 	return nil
 }
 
