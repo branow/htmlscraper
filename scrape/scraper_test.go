@@ -16,7 +16,7 @@ import (
 type ScrapeCfg struct {
 	CaseName   string
 	extractors map[*Match]Extractor
-	strict     bool
+	mode       Mode
 	doc        *goquery.Document
 	o          any
 	selector   string
@@ -26,7 +26,7 @@ type ScrapeCfg struct {
 }
 
 func test(t *testing.T, c ScrapeCfg) {
-	scraper := Scraper{Strict: c.strict}
+	scraper := Scraper{Mode: c.mode}
 	if c.extractors != nil {
 		scraper.Extractors = c.extractors
 	}
@@ -134,6 +134,7 @@ func TestScraper_Scrape_ScrapePointer(t *testing.T) {
 		},
 		{
 			CaseName: "nil pointers",
+			mode:     Silent,
 			doc:      getDoc(`<div id="top"></div>`),
 			o:        &A{},
 			selector: "#top",
@@ -181,24 +182,23 @@ func TestScraper_Scrape_ScrapeStruct(t *testing.T) {
 	cfgs := []ScrapeCfg{
 		{
 			CaseName: "not found",
-			strict:   true,
 			doc:      getDoc(`<div id="top"><div class="con">golang</div></div>`),
 			o:        &Ex1{},
 			selector: ".play",
 			exp:      &Ex1{},
-			eErr:     GetNotFoundErr(".play"),
+			eErr:     ScrapeErr{ScrapingErr{Selector: ".play", Cause: NoNodesFoundErr{}}},
 		},
 		{
 			CaseName: "field extract tag err",
-			strict:   true,
 			doc:      getDoc(`<div id="top"><div class="con">golang</div></div>`),
 			o:        &Ex1{},
 			selector: "#top > .con",
 			exp:      &Ex1{Name: "con"},
-			eErr:     GetExtractErr("TEXT"),
+			eErr:     ScrapeErr{ScrapingErr{Selector: "#top > .con", Cause: ExtractTagErr{"TEXT"}}},
 		},
 		{
 			CaseName: "normal execution",
+			mode:     Tolerant,
 			doc:      getDoc(`<div id="top"><div class="con">golang</div></div>`),
 			o:        &Ex2{},
 			selector: "#top > .con",
@@ -213,37 +213,40 @@ func TestScraper_Scrape_ScrapeString(t *testing.T) {
 	s1, s2, s3 := "", "", "golang"
 	cfgs := []ScrapeCfg{
 		{
-			CaseName: "not strict mod",
+			CaseName: "silent mod",
+			mode:     Silent,
 			doc:      getDoc(""),
 			selector: "p",
 			o:        &s1,
 			exp:      &s2,
 		},
 		{
-			CaseName: "strict mod",
-			strict:   true,
+			CaseName: "strict: no nodes found",
+			mode:     Strict,
 			doc:      getDoc(`<div class="con">Text</div>`),
 			o:        &s1,
 			exp:      &s2,
 			selector: ".cont",
-			eErr:     GetNotFoundErr(".cont"),
+			eErr:     ScrapeErr{ScrapingErr{Selector: ".cont", Cause: NoNodesFoundErr{}}},
 		},
 		{
-			CaseName: "empty extract err",
+			CaseName: "strict: empty extract",
+			mode:     Strict,
 			doc:      getDoc(`<div class="con">Text</div>`),
 			o:        &s1,
 			selector: ".con",
 			exp:      &s2,
-			eErr:     GetExtractErr(""),
+			eErr:     ScrapeErr{ScrapingErr{Selector: ".con", Cause: ExtractTagErr{}}},
 		},
 		{
 			CaseName: "extractor err",
+			mode:     Tolerant,
 			doc:      getDoc(`<div class="con">Text</div>`),
 			o:        &s1,
 			exp:      &s2,
 			selector: ".con",
 			extract:  "@href",
-			eErr:     WrapExtractErr(".con", GetAttributeNotFoundErr("href")),
+			eErr:     ScrapeErr{ScrapingErr{Selector: ".con", Cause: AttributeNotFoundErr{Attr: "href"}}},
 		},
 		{
 			CaseName: "inner text",
@@ -269,21 +272,21 @@ func TestScraper_Scrape_CommonErrors(t *testing.T) {
 	cfgs := []ScrapeCfg{
 		{
 			CaseName: "nil errors",
-			eErr:     errors.Join(GetNilErr("doc"), GetNilErr("o")),
+			eErr:     ScrapeErr{errors.Join(NilErr{Var: "doc"}, NilErr{Var: "o"})},
 		},
 		{
 			CaseName: "not a pointer",
 			doc:      getDoc(""),
 			o:        "",
 			exp:      "",
-			eErr:     GetKindErr("string", "ptr", "string"),
+			eErr:     ScrapeErr{KindErr{"o", "ptr", "string"}},
 		},
 		{
 			CaseName: "invalid kind",
 			doc:      getDoc(""),
 			o:        &map[int]int{},
 			exp:      &map[int]int{},
-			eErr:     GetMultiKindErr("map[int]int", []any{"string", "slice", "struct"}, "map"),
+			eErr:     ScrapeErr{KindErr{"o", []any{"string", "slice", "struct", "ptr"}, "map"}},
 		},
 	}
 	tab.RunWithCfgs(t, cfgs, test)

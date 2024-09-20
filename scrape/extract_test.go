@@ -38,7 +38,7 @@ func TestExtractAttribute(t *testing.T) {
 			},
 			"source",
 			"",
-			GetAttributeNotFoundErr("source"),
+			AttributeNotFoundErr{Attr: "source"},
 		},
 		{
 			"@attr source",
