@@ -5,41 +5,72 @@ import (
 	"strings"
 )
 
-func WrapExtractErr(selector string, err error) error {
-	err = fmt.Errorf("%w by selector: %s", err, selector)
-	return WrapScrapeErr(err)
+type ScrapeErr struct {
+	Cause error
 }
 
-func GetAttributeNotFoundErr(attr string) error {
-	return fmt.Errorf("attribute %s not found", attr)
+func (e ScrapeErr) Error() string {
+	msg := e.Cause.Error()
+	msgs := strings.Split(msg, "\n")
+	for i, m := range msgs {
+		msgs[i] = "scrape: " + m
+	}
+	return strings.Join(msgs, "\n")
 }
 
-func GetNotFoundErr(selector string) error {
-	err := fmt.Errorf("no nodes found by selector %s", selector)
-	return WrapScrapeErr(err)
+type AttributeNotFoundErr struct {
+	Attr string
 }
 
-func GetExtractErr(extract string) error {
-	err := fmt.Errorf("invalid extract: %s", extract)
-	return WrapScrapeErr(err)
+func (e AttributeNotFoundErr) Error() string {
+	return fmt.Sprintf("attribute \"%s\" not found", e.Attr)
 }
 
-func GetMultiKindErr(typeName any, expKinds []any, actKind any) error {
-	kinds := mapSlice(expKinds, func(k any) string { return fmt.Sprintf("%v", k) })
-	err := fmt.Errorf("%v must be a %s, but it is a %v", typeName, strings.Join(kinds, ","), actKind)
-	return WrapScrapeErr(err)
+type ExtractTagErr struct {
+	ExtractTag string
 }
 
-func GetKindErr(typeName, expKind, actKind any) error {
-	err := fmt.Errorf("%v must be a %v, but it is a %v", typeName, expKind, actKind)
-	return WrapScrapeErr(err)
+func (e ExtractTagErr) Error() string {
+	return fmt.Sprintf("invalid extract tag \"%s\"", e.ExtractTag)
 }
 
-func GetNilErr(name string) error {
-	err := fmt.Errorf("%s is nil", name)
-	return WrapScrapeErr(err)
+type ScrapingErr struct {
+	Selector string
+	Cause    error
 }
 
-func WrapScrapeErr(err error) error {
-	return fmt.Errorf("scrape: %w", err)
+func (e ScrapingErr) Error() string {
+	if e.Selector == "" {
+		return e.Cause.Error()
+	}
+	msg := e.Cause.Error()
+	msgs := strings.Split(msg, "\n")
+	for i, m := range msgs {
+		msgs[i] = e.Selector + " " + m
+	}
+	return strings.Join(msgs, "\n")
+}
+
+type NoNodesFoundErr struct{}
+
+func (e NoNodesFoundErr) Error() string {
+	return "no nodes found"
+}
+
+type KindErr struct {
+	Var     any
+	KindExp any
+	KindAct any
+}
+
+func (e KindErr) Error() string {
+	return fmt.Sprintf("%v must be a %v, but it is a %v", e.Var, e.KindExp, e.KindAct)
+}
+
+type NilErr struct {
+	Var string
+}
+
+func (e NilErr) Error() string {
+	return fmt.Sprintf("%s is nil", e.Var)
 }

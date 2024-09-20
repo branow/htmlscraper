@@ -2,6 +2,7 @@ package scrape
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/PuerkitoBio/goquery"
@@ -15,17 +16,26 @@ const (
 	ExtractorTag = "extract" // extract operation to get useful data from the node
 )
 
+type Mode uint
+
+const (
+	Strict Mode = iota
+	Tolerant
+	Silent
+)
+
 // Scraper is a struct that contains a method to scrape data from an
 // HTML document ([goquery.Document]).
 type Scraper struct {
 
-	// If Strict flag is true, the [Scraper.Scrape] method
-	// returns an error if the seeking HTML node is not found otherwise
-	// it returns a zero value according to the type. The exception is an
-	// slice type for which the flag does not work and even if there
-	// are not found notes it returns an empty slice of the specified type
-	// with a capacity of 10.
-	Strict bool
+	//Mode can take three states [Strict], [Tolerant], and [Silent].
+	// - [Strict] mode assumes that any error caused during scraping is fatal
+	// and stops the following scraping.
+	// - [Tolerant] mode assumes that scraping should not be prevented but
+	// errors where possible and all errors are returned.
+	// - [Silent] mode assumes that scraping should not be stopped by errors
+	// where possible and these errors are not returned.
+	Mode Mode
 
 	// Extractors is a map that matches custom user extractors to extract tags.
 	// Do not use reserved extractor tag names and patterns ([TextExtractTag],
@@ -47,17 +57,22 @@ type Scraper struct {
 // extract is required only if o is a pointer to a string or slice, in all
 // other cases you can leave it empty.
 func (scraper Scraper) Scrape(doc *goquery.Document, o any, selector string, extract string) error {
-	err := errors.Join(checkNil(doc, "doc"), checkNil(o, "o"))
+	err := errors.Join(ValidateNotNil(doc, "doc"), ValidateNotNil(o, "o"))
 	if err != nil {
-		return err
+		return ScrapeErr{err}
 	}
 
 	ot, ov := reflect.TypeOf(o), reflect.ValueOf(o)
 	if ot.Kind() != reflect.Pointer {
-		return GetKindErr(ot, reflect.Pointer, ot.Kind())
+		return ScrapeErr{KindErr{Var: "o", KindExp: reflect.Pointer, KindAct: ot.Kind()}}
 	}
 	ote, ove := ot.Elem(), ov.Elem()
-	return scraper.scrapeObject(doc.Selection, ote, ove, selector, extract)
+
+	err = scraper.scrapeObject(doc.Selection, ote, ove, selector, extract)
+	if err != nil && scraper.Mode != Silent {
+		return ScrapeErr{err}
+	}
+	return nil
 }
 
 func (scraper Scraper) scrapeObject(selection *goquery.Selection, ot reflect.Type, ov reflect.Value, selector string, extract string) error {
@@ -71,7 +86,8 @@ func (scraper Scraper) scrapeObject(selection *goquery.Selection, ot reflect.Typ
 	case reflect.Pointer:
 		return scraper.scrapePointer(selection, ot, ov, selector, extract)
 	default:
-		return GetMultiKindErr(ot, []any{reflect.String, reflect.Slice, reflect.Struct}, ot.Kind())
+		kinds := []any{reflect.String, reflect.Slice, reflect.Struct, reflect.Pointer}
+		return KindErr{Var: "o", KindExp: kinds, KindAct: ot.Kind()}
 	}
 }
 
@@ -79,89 +95,104 @@ func (scraper Scraper) scrapeString(selection *goquery.Selection, ov reflect.Val
 	if len(selector) != 0 {
 		selection = selection.Find(selector)
 	}
+
 	if selection.Size() == 0 {
-		if scraper.Strict {
-			return GetNotFoundErr(selector)
-		} else {
-			ov.SetString("")
-			return nil
-		}
+		return ScrapingErr{Selector: selector, Cause: NoNodesFoundErr{}}
 	}
 
 	node := selection.Nodes[0]
 	val, err := scraper.toExtract(node, extract)
+
 	if err != nil {
-		if err.Error() == GetExtractErr(extract).Error() {
-			return err
-		}
-		return WrapExtractErr(selector, err)
+		return ScrapingErr{Selector: selector, Cause: err}
 	}
+
 	ov.SetString(val)
 	return nil
 }
 
 func (scraper Scraper) scrapeSlice(selection *goquery.Selection, ot reflect.Type, ov reflect.Value, selector string, extract string) error {
+	if len(selector) != 0 {
+		selection = selection.Find(selector)
+	}
+
+	if selection.Size() == 0 {
+		return ScrapingErr{Selector: selector, Cause: NoNodesFoundErr{}}
+	}
+
 	ote := ot.Elem()
 	sv := reflect.MakeSlice(ot, 0, 10)
+
 	errs := []error{}
-	selection.Find(selector).Each(func(i int, selection *goquery.Selection) {
+	selection.EachWithBreak(func(i int, selection *goquery.Selection) bool {
 		ve := reflect.New(ote).Elem()
 		err := scraper.scrapeObject(selection, ote, ve, "", extract)
 		if err != nil {
+			s := fmt.Sprintf("%s:n(%d)", selector, i)
+			err := ScrapingErr{Selector: s, Cause: err}
 			errs = append(errs, err)
 		}
 		sv = reflect.Append(sv, ve)
+		return !(err != nil && scraper.Mode == Strict)
 	})
-	if len(errs) != 0 {
-		return errors.Join(errs...)
+
+	err := errors.Join(errs...)
+	if err == nil || scraper.Mode != Strict {
+		ov.Set(sv)
 	}
-	ov.Set(sv)
-	return nil
+
+	return err
 }
 
 func (scraper Scraper) scrapeStruct(selection *goquery.Selection, ot reflect.Type, ov reflect.Value, selector string) error {
 	if len(selector) != 0 {
 		selection = selection.Find(selector)
 	}
+
 	if selection.Size() == 0 {
-		if scraper.Strict {
-			return GetNotFoundErr(selector)
-		} else {
-			return nil
-		}
+		return ScrapingErr{Selector: selector, Cause: NoNodesFoundErr{}}
 	}
+
+	errs := []error{}
 	selection = selection.First()
+
 	for i := 0; i < ov.NumField(); i++ {
 		ft, fv := ot.Field(i), ov.Field(i)
-		selector, _ := ft.Tag.Lookup(SelectorTag)
-		extractor, _ := ft.Tag.Lookup(ExtractorTag)
-		err := scraper.scrapeObject(selection, ft.Type, fv, selector, extractor)
+		newSelection, _ := ft.Tag.Lookup(SelectorTag)
+		newExtractor, _ := ft.Tag.Lookup(ExtractorTag)
+		err := scraper.scrapeObject(selection, ft.Type, fv, newSelection, newExtractor)
+
 		if err != nil {
-			return err
+			err := ScrapingErr{Selector: selector, Cause: err}
+			if scraper.Mode == Strict {
+				return err
+			}
+			errs = append(errs, err)
 		}
 	}
-	return nil
+
+	return errors.Join(errs...)
 }
 
 func (scraper Scraper) scrapePointer(selection *goquery.Selection, ot reflect.Type, ov reflect.Value, selector, extract string) error {
 	if len(selector) != 0 {
 		selection = selection.Find(selector)
 	}
+
 	if selection.Size() == 0 {
-		if scraper.Strict {
-			return GetNotFoundErr(selector)
-		} else {
-			return nil
-		}
+		return ScrapingErr{Selector: selector, Cause: NoNodesFoundErr{}}
 	}
+
 	ote := ot.Elem()
 	newValue := reflect.New(ote)
 	err := scraper.scrapeObject(selection, ote, newValue.Elem(), "", extract)
+
 	if err != nil {
-		return err
+		err = ScrapingErr{Selector: selector, Cause: err}
 	}
+
 	ov.Set(newValue)
-	return nil
+	return err
 }
 
 func (s Scraper) toExtract(node *html.Node, extract string) (string, error) {
@@ -179,5 +210,5 @@ func (s Scraper) toExtract(node *html.Node, extract string) (string, error) {
 			return extractor(node, extract)
 		}
 	}
-	return "", GetExtractErr(extract)
+	return "", ExtractTagErr{ExtractTag: extract}
 }

@@ -5,23 +5,19 @@ import (
 	"slices"
 )
 
-func checkNil(a any, varName string) error {
-	if a == nil || (reflect.ValueOf(a).Kind() == reflect.Ptr && reflect.ValueOf(a).IsNil()) {
-		return GetNilErr(varName)
+// ValidateNotNil checks if the given o variable is nil or is a pointer
+// that points to nil and returns [NillErr] in the true case. varName
+// is a string the specifies the name of the variable that is nill.
+func ValidateNotNil(o any, varName string) error {
+	err := NilErr{Var: varName}
+	if o == nil || (reflect.ValueOf(o).Kind() == reflect.Ptr && reflect.ValueOf(o).IsNil()) {
+		return err
 	}
-	av := reflect.ValueOf(a)
+	av := reflect.ValueOf(o)
 	kinds := []reflect.Kind{reflect.Chan, reflect.Func, reflect.Interface, reflect.Map,
 		reflect.Pointer, reflect.Slice}
 	if slices.Contains(kinds, av.Kind()) && av.IsNil() {
-		return GetNilErr(varName)
+		return err
 	}
 	return nil
-}
-
-func mapSlice[T, U any](ts []T, f func(T) U) []U {
-	us := make([]U, len(ts))
-	for i := range ts {
-		us[i] = f(ts[i])
-	}
-	return us
 }

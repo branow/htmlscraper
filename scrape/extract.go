@@ -79,5 +79,5 @@ func ExtractAttribute(node *html.Node, attr string) (string, error) {
 			return v.Val, nil
 		}
 	}
-	return "", GetAttributeNotFoundErr(attr)
+	return "", AttributeNotFoundErr{Attr: attr}
 }
