@@ -25,7 +25,7 @@ func ScrapeStruct() {
 	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
-	scraper := scrape.Scraper{Extractors: customExtractors}
+	scraper := scrape.Scraper{Mode: scrape.Tolerant, Extractors: customExtractors}
 
 	// scraping
 	type Product struct {
