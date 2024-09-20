@@ -30,7 +30,7 @@ func GetExtractorMap() map[*Match]Extractor {
 
 	deepTextMatch := GetEqualMatch(DeepTextExtractTag)
 	m[&deepTextMatch] = func(node *html.Node, extract string) (string, error) {
-		data := ExtractText(node)
+		data := ExtractDeepText(node)
 		return data, nil
 	}
 
