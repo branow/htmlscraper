@@ -4,6 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/branow/htmlscraper)](https://goreportcard.com/report/github.com/branow/htmlscraper) 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/branow/htmlscraper)](https://pkg.go.dev/github.com/branow/htmlscraper)
 
+The module automates data scraping from HTML documents by specifying jQuery-like selectors and extracting functions as tags of fields of a struct or arguments during method calling respectively to the purpose.
 
 ## Table of Contents
 
@@ -177,7 +178,7 @@ func ScrapeSliceOfStructs() {
 	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
-	scraper := scrape.Scraper{Mode: scrape.Tolerant, Extractors: customExtractors}
+	scraper := scrape.Scraper{Extractors: customExtractors}
 
 	// scraping
 	type Product struct {
@@ -200,7 +201,7 @@ func ScrapeSliceOfStructs() {
 ```
 It prints:
 ```
-Got Error: scrape: .product:n(3) img no nodes found
+Got Error: <nil>
 Got Output:
 {Product 1 Great product for your needs. 29.99 https://via.placeholder.com/200}
 {Product 2 Top-rated product with excellent reviews. 39.99 https://via.placeholder.com/200}
@@ -239,7 +240,7 @@ func ScrapeStruct() {
 	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
-	scraper := scrape.Scraper{Mode: scrape.Tolerant, Extractors: customExtractors}
+	scraper := scrape.Scraper{Extractors: customExtractors}
 
 	// scraping
 	type Product struct {
@@ -269,7 +270,7 @@ func ScrapeStruct() {
 ```
 It prints:
 ```
-Got Error: scrape: .container .product:n(3) img no nodes found
+Got Error: <nil>
 Got Output:
 Catalog {
 Product Catalog
@@ -313,7 +314,7 @@ func ScrapePointers() {
 	customExtractors := map[*scrape.Match]scrape.Extractor{&priceMatch: priceExtractor}
 
 	// create Scraper
-	scraper := scrape.Scraper{Mode: scrape.Tolerant, Extractors: customExtractors}
+	scraper := scrape.Scraper{Extractors: customExtractors}
 
 	// scraping
 	type Image struct {
@@ -340,11 +341,11 @@ func ScrapePointers() {
 ```
 It prints:
 ```
-Got Error: scrape: .product:n(3) img no nodes found
+Got Error: <nil>
 Got Output:
-{Product 1 Great product for your needs. 29.99 0xc00009ade0}
-{Product 2 Top-rated product with excellent reviews. 39.99 0xc00009ae80}
-{Product 3 Best value for your money. 19.99 0xc00009af20}
+{Product 1 Great product for your needs. 29.99 0xc00009ad00}
+{Product 2 Top-rated product with excellent reviews. 39.99 0xc00009ada0}
+{Product 3 Best value for your money. 19.99 0xc00009ae40}
 {Product 4 The product that you want to buy. 10.99 <nil>}
 ```
 [The example file.](https://github.com/branow/htmlscraper/blob/main/examples/scrape_pointers.go)
